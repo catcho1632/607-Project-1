@@ -1,0 +1,88 @@
+---
+output:
+  html_document: default
+  word_document: default
+---
+# Project 1
+## by Catherine Cho
+
+### Reading in the text file via github.
+```{r}
+library(readr)
+#string of Text file uploaded from github.
+urlfile<-"https://raw.githubusercontent.com/catcho1632/607-Project-1/main/tournamentinfo.txt"
+#The text file is assigned as a string to the variable ELO
+ELO<-read_file(url(urlfile))
+
+```
+
+### Extracting strings of interest from ELO (text file), and creating string vectors for each. The strings were extracted using package stringr. 
+```{r}
+library(stringr)
+#Player's Name extracted using str_extract_all and regular expressions of different name structuring is defined. (i.e. First name and last name...First name middle initial last name...first name middle name last name...first name and last name only). Then the string is "unlisted" after splitting the string per name. 
+w<-str_extract_all(ELO,"([A-Z]+\\s[A-Z]+\\s[A-Z]+-[A-Z]+)|([A-Z]+\\s[A-Z]\\s[A-Z]+(\\s|-)[A-Z]+)|([A-Z]+\\s[A-Z]+\\s[A-Z]+)|([A-Z]+\\s[A-Z]+)",simplify = TRUE)
+names_unlist<-unlist(strsplit(w, "^[A-Z]+\\s[A-Z]+$)"))
+names<-names_unlist[-1]
+#Player's state extracted using str_extract_all and all states in the text file has at least 2 spaces preceding 2 capital cased letters. 
+x<-str_extract_all(ELO,"\\s\\s[A-Z]{2}",simplify = TRUE)
+state<-unlist(str_extract(x, "[A-Z][A-Z]"))
+#Total Number of Points is extracted using str_extract_all and is identified by the digit decimal digit regular expression. These are the only text value with this combination. 
+y<-str_extract_all(ELO,"\\d\\.\\d",simplify = TRUE)
+points<-unlist(str_extract(y, "\\d\\.\\d"))
+#Player's Pre-Rating is identified using regular expression that captures every character after "R: " and before "-".The string is then extracted by digits only. The numeric values are strings and converted to dbl in order to utilize the numeric value. 
+z<-str_extract_all(ELO,"[R]\\:\\s.+\\-",simplify = TRUE)
+pre_rating<-as.double(unlist(str_extract(z, "\\d\\d\\d+")))
+
+```
+
+### This section extracts all the opponents played by one player. 
+```{r}
+#The text file lists the player id number of each opponent per round. The only consistent character found was "|". This is the marker by which the string is extracted to form a dataframe. o1 extracts all digits and spaces preceding a "|" (with the "|" itself).  
+o1<-str_extract_all(ELO,"(\\d+\\|)|(\\s\\|)",simplify = TRUE)
+#o2 deletes all the values preceding the first round1 opponent for player 1. 
+o2<-o1[-1:-15]
+#o3 extracts all digits and all non digit strings are assigned <NA>. This will make it simpler to calculate the average later since a NA value will not be considered in the total average. 
+o3<-unlist(str_extract(o2, "\\d+"))
+
+#These are the opponent number played against each player for rounds 1-7.The opponent values are equally spaced per row, by 20 specifically. So a sequence is used to separate all round 1 apponents, round 2 opponents, round 3 opponents, etc. And the sequence will be listed in sequential order for players 1 to 64. The vectors are converted from string values to double. 
+round1_opp<-as.double(o3[seq(1,length(o3),20)])
+round2_opp<-as.double(o3[seq(2,length(o3),20)])
+round3_opp<-as.double(o3[seq(3,length(o3),20)])
+round4_opp<-as.double(o3[seq(4,length(o3),20)])
+round5_opp<-as.double(o3[seq(5,length(o3),20)])
+round6_opp<-as.double(o3[seq(6,length(o3),20)])
+round7_opp<-as.double(o3[seq(7,length(o3),20)])
+
+#Since the previous lines of code identifies opponent number, the following code will provide the pre-rating assocaited with each opponent. 
+round1_pre_r<-pre_rating[round1_opp]
+round2_pre_r<-pre_rating[round2_opp]
+round3_pre_r<-pre_rating[round3_opp]
+round4_pre_r<-pre_rating[round4_opp]
+round5_pre_r<-pre_rating[round5_opp]
+round6_pre_r<-pre_rating[round6_opp]
+round7_pre_r<-pre_rating[round7_opp]
+
+```
+
+### Calculating the average pre chess rating of opponents. 
+```{r}
+library(matrixStats)
+library(dplyr)
+#Dataframe ELO_rating is constructed in order to summarize the results thus far generated. 
+pair_num<-1:64
+ELO_rating<-data.frame(pair_num,names,state,points,pre_rating,round1_pre_r,round2_pre_r,round3_pre_r,round4_pre_r,round5_pre_r,round6_pre_r,round7_pre_r)
+ELO_rating
+
+#The mean is calculated per row (average of opponent pre-rating) and the final values are added to dataframe ELO_rating and is now called ELO_rating_Mean. 
+ELO_rating_Mean<-ELO_rating %>% mutate(Opp_pre_mean = apply(.[(6:12)],1,mean,na.rm=TRUE))
+
+#Subsetting Mean Column from ELO_rating_Mean dataframe. Each value represents the mean of each player's oppponent's pre-ratings for rounds 1-7.
+Opp_Pre_Mean<-round(subset(ELO_rating_Mean,select=c(Opp_pre_mean)))
+
+#Final dataframe summarizing player number, name, state, total points, pre-rating, opponent pre-rating average
+pair_num<-1:64
+ELO_final<-data.frame(pair_num,names,state,points,pre_rating,Opp_Pre_Mean)
+ELO_final
+
+```
+
